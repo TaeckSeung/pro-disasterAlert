@@ -1,4 +1,4 @@
-통신사에 긴급 재난문자 보내기 (disaster alert, cell broadcast service)
+통신사에 긴급 재난문자 보내기 5G (disaster alert, cell broadcast service)
 =====
 
 이 문서에서는 기관에서 통신사를 통해 고객들에게 긴급 재난문자를 보내는 흐름 및 프로젝트 코드를 기술한다.
@@ -541,7 +541,7 @@ NRF(Network Repository Function)와 통신하여 메시지를 보낼 기저데�
             </appender>
 
             <springProperty name="serviceName" source="project.service-name" defaultValue="5gsacbc.000"/>
-            <appender name="TLO_FILE" class="com.lgu.cbcf.tlo.TloFiveMinAppender">
+            <appender name="TLO_FILE" class="com.xxx.cbcf.tlo.TloFiveMinAppender">
                 <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
                     <fileNamePattern>log/%d{yyyyMMdd, aux}/${serviceName}.%d{yyyyMMddHHmm}.log</fileNamePattern>
                 </rollingPolicy>
@@ -803,7 +803,32 @@ NRF(Network Repository Function)와 통신하여 메시지를 보낼 기저데�
 - ASN.1  
   - https://www.asnlab.org/  
   - free trial 1 month: https://www.asnlab.org/freetrial.html  
-  - WriteReplaceRequest  
+  - [NGAP-PDU-Descriptions.asn](./asn.1/NGAP-PDU-Descriptions.asn) (WriteReplaceWarningRequest) (ASN.1)
+    ```asn.1 
+        WriteReplaceWarningRequest ::= SEQUENCE {
+            protocolIEs		ProtocolIE-Container		{ {WriteReplaceWarningRequestIEs} },
+            ...
+        }
+
+        WriteReplaceWarningRequestIEs NGAP-PROTOCOL-IES ::= {	
+            { ID id-MessageIdentifier				CRITICALITY reject	TYPE MessageIdentifier					PRESENCE mandatory	}|
+            { ID id-SerialNumber					CRITICALITY reject	TYPE SerialNumber						PRESENCE mandatory	}|
+            { ID id-WarningAreaList					CRITICALITY ignore	TYPE WarningAreaList					PRESENCE optional		}|
+            { ID id-RepetitionPeriod				CRITICALITY reject	TYPE RepetitionPeriod					PRESENCE mandatory	}|
+            { ID id-NumberOfBroadcastsRequested		CRITICALITY reject	TYPE NumberOfBroadcastsRequested		PRESENCE mandatory	}|
+            { ID id-WarningType						CRITICALITY ignore	TYPE WarningType						PRESENCE optional		}|
+            { ID id-WarningSecurityInfo				CRITICALITY ignore	TYPE WarningSecurityInfo				PRESENCE optional		}|
+            { ID id-DataCodingScheme				CRITICALITY ignore	TYPE DataCodingScheme					PRESENCE optional		}|
+            { ID id-WarningMessageContents			CRITICALITY ignore	TYPE WarningMessageContents				PRESENCE optional		}|
+            { ID id-ConcurrentWarningMessageInd		CRITICALITY reject	TYPE ConcurrentWarningMessageInd		PRESENCE optional		}|
+            { ID id-WarningAreaCoordinates			CRITICALITY ignore	TYPE WarningAreaCoordinates				PRESENCE optional		},
+            ...
+        }
+    ```
+    [3GPP 38413-f60 Elementary Procedure Definitions](https://portal.3gpp.org/desktopmodules/Specifications/SpecificationDetails.aspx?specificationId=3223)
+    
+
+  - WriteReplaceRequest (java) 
     ```java
     @Slf4j
     public class WriteReplaceRequest implements Cloneable {
@@ -1041,3 +1066,23 @@ NRF(Network Repository Function)와 통신하여 메시지를 보낼 기저데�
 
     ```
 
+- NRF  
+  - NRF와 http 통신 
+  - [3GPP 29510-g00 TS 29.510 clause 5.2.2.2](https://www.google.com/url?client=internal-element-cse&cx=011147748590557393066:btgfoc_873q&q=https://www.3gpp.org/DynaReport/29510.htm&sa=U&ved=2ahUKEwi-gd_p3YroAhWMvZQKHUiMCcgQFjAAegQIBRAC&usg=AOvVaw1QDCufqufmL53dN2cjZ9vc) 
+  - openapi yaml
+    - [TS29510_Nnrf_NFManagement.yaml](./3GPP/29510-g00/TS29510_Nnrf_NFManagement.yaml)
+    - [TS29510_Nnrf_NFDiscovery.yaml](./3GPP/29510-g00/TS29510_Nnrf_NFDiscovery.yaml)
+    - [TS29510_Nnrf_AccessToken.yaml](./3GPP/29510-g00/TS29510_Nnrf_AccessToken.yaml)
+  
+  - https://editor.swagger.io 에서 yaml 열어서 확인가능.
+
+
+- AMF  
+  - AMF와 http 통신 
+  - [3GPP 29518-g00 TS 29.518](https://portal.3gpp.org/desktopmodules/Specifications/SpecificationDetails.aspx?specificationId=3339) 
+  - openapi yaml
+    - [TS29518_Namf_Communication.yaml](./3GPP/29518-g00/TS29518_Namf_Communication.yaml)
+    - [TS29518_Namf_EventExposure.yaml](./3GPP/29518-g00/TS29518_Namf_EventExposure.yaml)
+    - [TS29518_Namf_Location.yaml](./3GPP/29518-g00/TS29518_Namf_Location.yaml)
+    - [TS29518_Namf_MT.yaml](./3GPP/29518-g00/TS29518_Namf_MT.yaml)
+  - https://editor.swagger.io 에서 yaml 열어서 확인가능.
