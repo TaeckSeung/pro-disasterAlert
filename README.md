@@ -6,6 +6,8 @@
 
 ## 흐름도
 - 국가 재난망 → 통신사(CBCF) → AMF →  기지국(NODE) → 휴대폰(UE)
+![WarningMessageDeliveryProcedureInNG-RAN](./images/9.1.3.5.2-1_WarningMessageDeliveryProcedureInNG-RAN.png)
+
 
 데이터 흐름이 진행된다. 
 여기서 우리는 ***[국가 재난망 → 통신사(CBCF) → AMF]*** 이부분에서의 ***통신사(CBCF)*** 의 프로젝트 구성 및 코드를 알아볼것이다.
