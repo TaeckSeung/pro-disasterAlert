@@ -569,6 +569,7 @@ NRF(Network Repository Function)와 통신하여 메시지를 보낼 기저데�
 모든 프로젝트의 공통으로 사용되는 공통 core
 - AOP
   - ApiOperatorAOP (CBCF Process들의 loging 처리)
+    - @ApiOperator anotation 붙이면 자동으로 Process별 시작,종료,오류 등등 로그 DB처리
     ```java
     @Aspect
     @Component
@@ -672,7 +673,8 @@ NRF(Network Repository Function)와 통신하여 메시지를 보낼 기저데�
     }
     ```
     
-- TlogAOP (Tlo loging 처리)
+  - TlogAOP (Tlo loging 처리)
+    - @Tlog anotation 붙이면 자동으로 TloServer에 로그 전송되도록 처리
     ```java
     @Aspect
     @Component
@@ -795,7 +797,7 @@ NRF(Network Repository Function)와 통신하여 메시지를 보낼 기저데�
     - namf: 29518-g00
       - TS 29.518
     - commomData: 29571-g00
-    - ans.1: 38413-f60
+    - as1.1: 38413-f60
     - http2: 29500-g00
     - 5g Warning Message Delivery Procedure: 23041-g20  
   

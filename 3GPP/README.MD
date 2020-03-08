@@ -13,7 +13,7 @@ index
  - namf: 29518-g00
    - TS 29.518
  - commomData: 29571-g00
- - ans.1: 38413-f60
+ - asn.1: 38413-f60
  - http2: 29500-g00
  - 5g Warning Message Delivery Procedure: 23041-g20
  
