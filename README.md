@@ -10,7 +10,13 @@
 [3GPP 23041-g20, 9.1.3.5.2	Warning Message Delivery Procedure](https://portal.3gpp.org/desktopmodules/Specifications/SpecificationDetails.aspx?specificationId=748)
 
 데이터 흐름이 진행된다. 
-여기서 우리는 ***[국가 재난망 → 통신사(CBCF) → AMF]*** 이부분에서의 ***통신사(CBCF)*** 의 프로젝트 구성 및 코드를 알아볼것이다.
+여기서 우리는 ***[국가 재난망 → 통신사(CBCF) → AMF]*** 이부분에서의 ***통신사(CBCF)*** 의 프로젝트 구성 및 코드를 알아볼것이다. ***(프로젝트 특성상 프로젝트 구성 및 흐름만 공개한다.)***
+
+# 규격
+ - 3GPP https://www.3gpp.org/
+ - http/2
+ - openapi
+  
 
 <br><br>
 
@@ -294,7 +300,7 @@ NRF(Network Repository Function)와 통신하여 메시지를 보낼 기저데�
 - spring project
 - 역할
   - 통신사에서 제공받은 기지국의 데이터를 파싱 및 DB를 현행화한다.
-- schudler
+- scheduler
   ```java
     @Component
     @Slf4j
@@ -315,7 +321,7 @@ NRF(Network Repository Function)와 통신하여 메시지를 보낼 기저데�
 - spring project
 - 역할
 
-- schudler
+- scheduler
   ```java
     @Component
     @Slf4j
