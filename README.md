@@ -6,8 +6,8 @@
 
 ## 흐름도
 - 국가 재난망 → 통신사(CBCF) → AMF →  기지국(NODE) → 휴대폰(UE)
-![WarningMessageDeliveryProcedureInNG-RAN](./images/9.1.3.5.2-1_WarningMessageDeliveryProcedureInNG-RAN.png)
-
+![WarningMessageDeliveryProcedureInNG-RAN](./images/9.1.3.5.2-1_WarningMessageDeliveryProcedureInNG-RAN.png)  
+[3GPP 23041-g20, 9.1.3.5.2	Warning Message Delivery Procedure](https://portal.3gpp.org/desktopmodules/Specifications/SpecificationDetails.aspx?specificationId=748)
 
 데이터 흐름이 진행된다. 
 여기서 우리는 ***[국가 재난망 → 통신사(CBCF) → AMF]*** 이부분에서의 ***통신사(CBCF)*** 의 프로젝트 구성 및 코드를 알아볼것이다.
@@ -29,6 +29,8 @@ CBCF
    - 운영관리에 필요한 기능을 제공한다.
 6. tlo
    - 모든 프로세스들을 시스템 감지처리할수있도록 로그를 수집 한다.
+
+![CBPP Process](./images/cbpp_process.png)  
 
 <br><br>
 
@@ -785,9 +787,22 @@ NRF(Network Repository Function)와 통신하여 메시지를 보낼 기저데�
 - NRF, AMF통신에 필요한 WebClient, ASN.1등의 공통 core  
 - 3gpp  
   - https://www.3gpp.org/  
+  - index
+    - nnrf: 29510-g00
+      - TS 29.510 clause 5.2.2.2
+    - namf: 29518-g00
+      - TS 29.518
+    - commomData: 29571-g00
+    - ans.1: 38413-f60
+    - http2: 29500-g00
+    - 5g Warning Message Delivery Procedure: 23041-g20  
+  
+- swagger openapi editor
+  - https://editor.swagger.io
+  
 - ASN.1  
   - https://www.asnlab.org/  
-  - free trial: https://www.asnlab.org/freetrial.html  
+  - free trial 1 month: https://www.asnlab.org/freetrial.html  
   - WriteReplaceRequest  
     ```java
     @Slf4j
