@@ -10,7 +10,6 @@
 데이터 흐름이 진행된다. 
 여기서 우리는 ***[국가 재난망 → 통신사(CBCF) → AMF]*** 이부분에서의 ***통신사(CBCF)*** 의 프로젝트 구성 및 코드를 알아볼것이다.
 
-
 <br><br>
 
 CBCF
@@ -561,7 +560,7 @@ NRF(Network Repository Function)와 통신하여 메시지를 보낼 기저데�
 - - -
 
 # core
-모든 프로젝트의 공통으로 사용되는 core
+모든 프로젝트의 공통으로 사용되는 공통 core
 - AOP
   - ApiOperatorAOP (CBCF Process들의 loging 처리)
     ```java
@@ -780,12 +779,14 @@ NRF(Network Repository Function)와 통신하여 메시지를 보낼 기저데�
 
     ```
 
+# external-communication-core  
+- NRF, AMF통신에 필요한 WebClient, ASN.1등의 공통 core  
 - 3gpp  
   - https://www.3gpp.org/  
-- ANS.1
+- ASN.1  
   - https://www.asnlab.org/  
   - free trial: https://www.asnlab.org/freetrial.html  
-  - WriteReplaceRequest
+  - WriteReplaceRequest  
     ```java
     @Slf4j
     public class WriteReplaceRequest implements Cloneable {
