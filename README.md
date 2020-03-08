@@ -171,6 +171,8 @@ NRF(Network Repository Function)와 통신하여 메시지를 보낼 기저데�
   - secondary (예: 대전)  
     - order1 nrf  
     - order2 nrf  
+- AMF 정보
+  - NRF에서 받아온 AMF정보는 여러개 (처리 지역 tai range에 따라)
 
 - 역할
   - NRF에 heartBeat를 보낸다.
@@ -1086,3 +1088,416 @@ NRF(Network Repository Function)와 통신하여 메시지를 보낼 기저데�
     - [TS29518_Namf_Location.yaml](./3GPP/29518-g00/TS29518_Namf_Location.yaml)
     - [TS29518_Namf_MT.yaml](./3GPP/29518-g00/TS29518_Namf_MT.yaml)
   - https://editor.swagger.io 에서 yaml 열어서 확인가능.
+
+- EcoreExternalCommunicationService (NRF, AMF 외부통신 서비스)
+  ```java
+    @Slf4j
+    public abstract class EcoreExternalCommunicationService {
+
+        // ...
+        // NRF 정보를 가져온다.
+        public NFProfile getNFProfileAtNrf(CoreCbcf cbcf, NrfInfoBase nrfInfo) {
+
+            ClientResponse response = httpService.newWebClientBuilder()
+                    .defaultHeader(X_AHOST, null != nrfInfo.getIpv4() ? nrfInfo.getIpv4() : "").defaultHeader(X_APORT, null != nrfInfo.getPort() ? nrfInfo.getPort().toString() : "")
+                    .baseUrl(nrfApiRoot).build().get().uri(uriBuilder -> {
+                        Map<String, String> pathMap = new HashMap<>();
+                        pathMap.put("nfInstanceID", cbcf.getInstanceId());
+                        return uriBuilder.path(nrfPathNFInstancesDocument).build(pathMap);
+                    }).accept(MediaType.APPLICATION_JSON).exchange().timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+
+            ClientResponse.Headers rHeader = response.headers();
+            HttpStatus rStatus = response.statusCode();
+            if (!Range.closed(200, 299).contains(rStatus.value())) {
+                throw HttpClientErrorException.create(rStatus, null == rStatus ? "" : rStatus.toString(), null == rHeader ? null : rHeader.asHttpHeaders(), null, null);
+            }
+            NFProfile block = response.bodyToMono(NFProfile.class).timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+            return block;
+        }
+
+        // AMF정보를 Subscriptions 한다.
+        public SubscriptionData postSubscriptionsToAmfAtNrf(NrfInfoBase nrfInfo) {
+            Date nextWantValidityTime = new Date(new Date().getTime() + nrfSubscriptionJumpValidityMillisecond);
+            SubscriptionData subscriptionData = SubscriptionData.builder()
+                    .nfStatusNotificationUri(nrfSubscriptionNfStatusNotificationUrl)
+                    .validityTime(ZonedDateTime.ofInstant(nextWantValidityTime.toInstant(), ZoneId.systemDefault()))
+                    .subscrCond(NfTypeCond.builder().nfType(NFType.AMF).build())
+                    .build();
+
+            ClientResponse response = httpService.newWebClientBuilder()
+                    .defaultHeader(X_AHOST, null != nrfInfo.getIpv4() ? nrfInfo.getIpv4() : "").defaultHeader(X_APORT, null != nrfInfo.getPort() ? nrfInfo.getPort().toString() : "")
+                    .baseUrl(nrfApiRoot).build().post().uri(nrfPathSubscriptionsCollection)
+                    .accept(MediaType.APPLICATION_JSON).contentType(MediaType.APPLICATION_JSON)
+                    .body(BodyInserters.fromObject(subscriptionData)).exchange().timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+            ClientResponse.Headers rHeader = response.headers();
+            HttpStatus rStatus = response.statusCode();
+            if (!Range.closed(200, 299).contains(rStatus.value())) {
+                throw HttpClientErrorException.create(rStatus, null == rStatus ? "" : rStatus.toString(), null == rHeader ? null : rHeader.asHttpHeaders(), null, null);
+            }
+            SubscriptionData block = response.bodyToMono(SubscriptionDataNfTypeCond.class).timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+            return block;
+        }
+
+        // Subscriptions (Document) Updates a subscription
+        public SubscriptionData patchSubscriptionsAtNrf(NrfInfoBase nrfInfo, EcoreNrfInfoProcess nrfInfoProcess) {
+            ZoneOffset zero = ZoneOffset.of("+00");
+            String value = ZonedDateTime.now(zero)
+                    .plus(nrfSubscriptionJumpValidityMillisecond, ChronoUnit.MILLIS)
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"));
+            PatchItem patchItem = PatchItem.builder()
+                    .op(PatchOperation.replace)
+                    .path("/validityTime")
+                    .value(value).build();
+
+            List<PatchItem> body = new ArrayList<>();
+            body.add(patchItem);
+
+            ClientResponse response = httpService.newWebClientBuilder()
+                    .defaultHeader(X_AHOST, null != nrfInfo.getIpv4() ? nrfInfo.getIpv4() : "").defaultHeader(X_APORT, null != nrfInfo.getPort() ? nrfInfo.getPort().toString() : "")
+                    .baseUrl(nrfApiRoot).build().patch().uri(uriBuilder -> {
+                Map<String, String> pathMap = new HashMap<>();
+                pathMap.put("subscriptionID", nrfInfoProcess.getSubscriptionId());
+                return uriBuilder.path(nrfPathSubscriptionsDocument).build(pathMap);
+            })
+                    .accept(MediaType.APPLICATION_JSON).contentType(MediaType.parseMediaType("application/json-patch+json"))
+                    .body(BodyInserters.fromObject(body)).exchange().timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+
+            ClientResponse.Headers rHeader = response.headers();
+            HttpStatus rStatus = response.statusCode();
+            if (!Range.closed(200, 299).contains(rStatus.value())) {
+                throw HttpClientErrorException.create(rStatus, null == rStatus ? "" : rStatus.toString(), null == rHeader ? null : rHeader.asHttpHeaders(), null, null);
+            }
+            SubscriptionData block = response.bodyToMono(SubscriptionDataNfTypeCond.class).timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+            return block;
+        }
+
+        // CBCF를 NRF에 Register a new NF Instance
+        public NFProfile putNFProfileRegisterAndRsponseStatusRegistered(CoreCbcf cbcf, NrfInfoBase nrfInfo) {
+            NFProfile nfProfile = putNFProfileRegisterAtNrf(cbcf, nrfInfo);
+            if (NFStatus.REGISTERED != nfProfile.getNfStatus()) {
+                throw new ErrorMsgException("nfStatus is not REGISTERED");
+            }
+            return nfProfile;
+        }
+
+        public NFProfile putNFProfileRegisterAtNrf(CoreCbcf cbcf, NrfInfoBase nrfInfo) {
+            NFProfile nfProfile = NFProfile.builder()
+                    .nfInstanceId(cbcf.getInstanceId())
+                    .nfType(NFType.CBCF)
+                    .nfStatus(NFStatus.REGISTERED).build();
+
+            WebClient.RequestHeadersSpec<?> request = httpService.newWebClientBuilder()
+                    .defaultHeader(X_AHOST, null != nrfInfo.getIpv4() ? nrfInfo.getIpv4() : "").defaultHeader(X_APORT, null != nrfInfo.getPort() ? nrfInfo.getPort().toString() : "")
+                    .baseUrl(nrfApiRoot).build().put().uri(uriBuilder -> {
+                Map<String, String> pathMap = new HashMap<>();
+                pathMap.put("nfInstanceID", cbcf.getInstanceId());
+                return uriBuilder.path(nrfPathNFInstancesDocument).build(pathMap);
+            })
+                    .accept(MediaType.APPLICATION_JSON).contentType(MediaType.APPLICATION_JSON)
+                    .body(BodyInserters.fromObject(nfProfile));
+
+            ClientResponse response = request.exchange().timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+
+
+            ClientResponse.Headers rHeader = response.headers();
+            HttpStatus rStatus = response.statusCode();
+            if (!Range.closed(200, 299).contains(rStatus.value())) {
+                throw HttpClientErrorException.create(rStatus, null == rStatus ? "" : rStatus.toString(), null == rHeader ? null : rHeader.asHttpHeaders(), null, null);
+            }
+            NFProfile block = response.bodyToMono(NFProfile.class).timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+            return block;
+        }
+
+        // Update NF Instance profile // 204또는 200떨어짐
+        public NFProfile patchNFProfileAndRsponseStatusRegisteredAtNrf(CoreCbcf cbcf, NrfInfoBase nrfInfo) {
+            NFProfile nfProfile = patchNFProfileAtNrf(cbcf, nrfInfo);
+            if (null != nfProfile && NFStatus.REGISTERED != nfProfile.getNfStatus()) {
+                throw new ErrorMsgException("nfStatus is not REGISTERED");
+            }
+            return nfProfile;
+        }
+
+        public NFProfile patchNFProfileAtNrf(CoreCbcf cbcf, NrfInfoBase nrfInfo) {
+            PatchItem patchItem = PatchItem.builder()
+                    .op(PatchOperation.replace)
+                    .path("/nfStatus")
+                    .value(NFStatus.REGISTERED.name()).build();
+
+            List<PatchItem> body = new ArrayList<>();
+            body.add(patchItem);
+
+            ClientResponse response = httpService.newWebClientBuilder()
+                    .defaultHeader(X_AHOST, null != nrfInfo.getIpv4() ? nrfInfo.getIpv4() : "").defaultHeader(X_APORT, null != nrfInfo.getPort() ? nrfInfo.getPort().toString() : "")
+                    .baseUrl(nrfApiRoot).build().patch().uri(uriBuilder -> {
+                Map<String, String> pathMap = new HashMap<>();
+                pathMap.put("nfInstanceID", cbcf.getInstanceId());
+                return uriBuilder.path(nrfPathNFInstancesDocument).build(pathMap);
+            })
+
+                    .accept(MediaType.APPLICATION_JSON).contentType(MediaType.parseMediaType("application/json-patch+json"))
+                    .body(BodyInserters.fromObject(body)).exchange().timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+
+            ClientResponse.Headers rHeader = response.headers();
+            HttpStatus rStatus = response.statusCode();
+            if (!Range.closed(200, 299).contains(rStatus.value())) {
+                throw HttpClientErrorException.create(rStatus, null == rStatus ? "" : rStatus.toString(), null == rHeader ? null : rHeader.asHttpHeaders(), null, null);
+            }
+            NFProfile block = response.bodyToMono(NFProfile.class).timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+            return block;
+        }
+
+        // AMF통신시 필요한 oauth2Token을 받아온다.
+        public Oauth2Token postOauth2RegisterToNamfComAtNrf(CoreCbcf cbcf, NrfInfoBase nrfInfo) {
+            MultiValueMap<String, String> formDat = new LinkedMultiValueMap<>();
+            formDat.set("grant_type", "client_credentials");
+            formDat.set("nfInstanceId", cbcf.getInstanceId());
+            formDat.set("nfType", NFType.CBCF.name());
+            formDat.set("targetNfType", NFType.AMF.name());
+            formDat.set("scope", "namf-comm");
+
+            ClientResponse response = httpService.newWebClientBuilder()
+                    .defaultHeader(X_AHOST, null != nrfInfo.getIpv4() ? nrfInfo.getIpv4() : "").defaultHeader(X_APORT, null != nrfInfo.getPort() ? nrfInfo.getPort().toString() : "")
+                    .baseUrl(nrfApiRoot).build().post().uri(nrfPathOauth2Token)
+                    .accept(MediaType.APPLICATION_JSON).contentType(MediaType.APPLICATION_JSON)
+                    .body(BodyInserters.fromFormData(formDat)).exchange().timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+            ClientResponse.Headers rHeader = response.headers();
+            HttpStatus rStatus = response.statusCode();
+            if (!Range.closed(200, 299).contains(rStatus.value())) {
+                throw HttpClientErrorException.create(rStatus, null == rStatus ? "" : rStatus.toString(), null == rHeader ? null : rHeader.asHttpHeaders(), null, null);
+            }
+            Oauth2Token block = response.bodyToMono(Oauth2Token.class).timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+            return block;
+        }
+
+        // AMF정보를 Discovery Amf Info 한다.
+        public SearchResult getDiscoveryToAmfAtNrf(NrfInfoBase nrfInfo) {
+            ClientResponse response = httpService.newWebClientBuilder()
+                    .defaultHeader(X_AHOST, null != nrfInfo.getIpv4() ? nrfInfo.getIpv4() : "").defaultHeader(X_APORT, null != nrfInfo.getPort() ? nrfInfo.getPort().toString() : "")
+                    .baseUrl(nrfApiRoot).build().get().uri(uriBuilder -> uriBuilder.path(nrfPathDiscoveryStore)
+                            .queryParam("requester-nf-type", NFType.CBCF.name())
+                            .queryParam("target-nf-type", NFType.AMF.name())
+                            .build())
+                    .accept(MediaType.APPLICATION_JSON).exchange().timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+            ClientResponse.Headers rHeader = response.headers();
+            HttpStatus rStatus = response.statusCode();
+            if (!Range.closed(200, 299).contains(rStatus.value())) {
+                throw HttpClientErrorException.create(rStatus, null == rStatus ? "" : rStatus.toString(), null == rHeader ? null : rHeader.asHttpHeaders(), null, null);
+            }
+            SearchResult block = response.bodyToMono(SearchResult.class).timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+            return block;
+        }
+
+        // AMF에 메시지를 전송한다.
+        public N2InformationTransferRspData postNonUeN2MessageTransferAtAmf(EcoreSendCell sendCell, TripleConsumer<EcoreAmfInfo, Date, Throwable> amfError) throws Exception {
+            if (null == sendCell || null == sendCell.getMsgCell() || null == sendCell.getMsgCell().getMsg()) {
+                throw new ErrorMsgException();
+            }
+            var msgCell = sendCell.getMsgCell();
+            var msg = msgCell.getMsg();
+            if(null == msgCell || null == msg) {
+                sendCell = sendCellRepository.fetchMsgCellAndMsg(sendCell.getSendCellSeq());
+            }
+            var apiRoot = amfApiRoot;
+
+            var amf = amfRepository.findInnerFetchAmfInfoAndIpv4NotNullAndPortNotNull(sendCell.getAmfSeq(), AmfStatus.A);
+            var jsonData = new N2InformationTransferReqData();
+
+            String contentId = "********";
+
+            if (Strings.isNotBlank(sendCell.getSendTac())) {
+                List<Tai> tais = new ArrayList<>();
+                Splitter.fixedLength(EcoreExternalCommunicationService.SEND_DIV_TAC_HEX_LEN).split(sendCell.getSendTac()).forEach(it -> {
+                    tais.add(Tai.builder()
+                            .plmnId(
+                                    PlmnId.builder()
+                                            .mcc(MCC)
+                                            .mnc(MNC)
+                                            .build()
+                            )
+                            .tac(it)
+                            .build());
+                });
+                jsonData.setTaiList(tais);
+            }
+            if (Strings.isNotBlank(sendCell.getSendCell())) {
+                List<Ncgi> ncgis = new ArrayList<>();
+                Splitter.fixedLength(EcoreExternalCommunicationService.SEND_DIV_CELL_HEX_LEN_PLUSE_SPACING).split(sendCell.getSendCell()).forEach(it -> {
+                    ncgis.add(Ncgi.builder()
+                            .plmnId(
+                                    PlmnId.builder()
+                                            .mcc(MCC)
+                                            .mnc(MNC)
+                                            .build()
+                            )
+                            .nrCellId(it.substring(0, SEND_DIV_CELL_HEX_LEN))
+                            .build());
+                });
+                jsonData.setNcgiList(ncgis);
+            }
+            jsonData.setRatSelector(RatSelector.NR);
+            jsonData.setN2Information(
+                    N2InfoContainer.builder()
+                            .n2InformationClass(N2InformationClass.PWS)
+                            .pwsInfo(
+                                    PwsInformation.builder()
+                                            .messageIdentifier(msg.getCategoryId().intValue())
+                                            .serialNumber(msg.getSerialNumber().intValue())
+                                            .pwsContainer(
+                                                    N2InfoContent.builder()
+                                                            .ngapMessageType(ProcedureCode.id_WriteReplaceWarning)
+                                                            .ngapData(
+                                                                    RefToBinaryData.builder()
+                                                                            .contentId(contentId)
+                                                                            .build()
+                                                            )
+                                                            .build()
+                                            )
+                                            .build()
+                            )
+                            .build()
+            );
+
+            var message = new WriteReplaceRequest(msg.getMsgSeq().intValue(), msg.getMsg(), msg.getRepeatPeriod().intValue(), msg.getRequestNum().intValue(), msg.getCategoryId().intValue(), msg.getSerialNumber().intValue());
+            message.makeSapWriteReplace(sendCell.getSendDiv().name(), sendCell.getSendTac(), sendCell.getSendCell());
+            var ansHex = ansEncodeString(message.sapWriteReplace);
+            String printAns = ansPrint(message.sapWriteReplace);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            log.info(printAns);
+            log.info(
+                    "cbpp amf send" + System.lineSeparator() +
+                            "jsonData: " + jsonData + System.lineSeparator() +
+                            "binaryDateN2Information: " + ansHex + System.lineSeparator() +
+                            "msg: " + msg + System.lineSeparator() +
+                            "msgCell:" + msgCell + System.lineSeparator() +
+                            "sendCell:" + sendCell + System.lineSeparator() +
+                            "amf: " + amf + System.lineSeparator()
+            );
+            var bodyBuilder = new MultipartBodyBuilder();
+            bodyBuilder.part("jsonData", jsonData).header(HttpHeaders.CONTENT_TYPE.toLowerCase(), MediaType.APPLICATION_JSON_VALUE.toLowerCase());
+            bodyBuilder.part("binaryDateN2Information", ansHex).header(HttpHeaders.CONTENT_TYPE.toLowerCase(), "application/vnd.3gpp.ngap").header("content-id", contentId);
+
+            N2InformationTransferRspData n2InformationTransferRspData = null;
+            for (int i = 0; null != amf && CollectionUtils.isNotEmpty(amf.getAmfInfos()) && i < amf.getAmfInfos().size(); i++) {
+                var now = new Date();
+                EcoreAmfInfo amfInfo = amf.getAmfInfos().get(i);
+                try {
+                    log.info("amfInfo Http Send-> {}", amfInfo);
+                    WebClient.Builder builder = httpService.newWebClientBuilder().baseUrl(apiRoot).defaultHeader(X_AHOST, amfInfo.getIpv4()).defaultHeader(X_APORT, amfInfo.getPort().toString());
+                    if (Boolean.valueOf(amfEnableOauth2Token)) {
+                        EcoreNrfInfoProcess nrfInfoProcess = ecoreNrfInfoProcessService.findAliveFeatchNrfInfoFirstOne(cbcfService.myCbcfAliveFetchProcess().getCbcfSeq());
+                        if (null == nrfInfoProcess) {
+                            log.error("amfInfo Http Send Token is null  checked nrfInfoProcess Table");
+                        }
+                        log.info("amfInfo Http Send Token -> {}: {}", nrfInfoProcess.getAmfCommTokenType(), nrfInfoProcess.getAmfCommAccessToken());
+                        builder.defaultHeader(nrfInfoProcess.getAmfCommTokenType(), nrfInfoProcess.getAmfCommAccessToken());
+                    }
+
+                    ClientResponse response = builder.build().post().uri(amfPathNonUEN2MessagesCollectionDocument)
+                            .body(new AmfMultipartRelatedInserter().withInternal(bodyBuilder.build())).exchange().timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+                    ClientResponse.Headers rHeader = response.headers();
+                    HttpStatus rStatus = response.statusCode();
+                    if (!Range.closed(200, 299).contains(rStatus.value())) {
+                        throw HttpClientErrorException.create(rStatus, null == rStatus ? "" : rStatus.toString(), null == rHeader ? null : rHeader.asHttpHeaders(), null, null);
+                    }
+                    n2InformationTransferRspData = response.bodyToMono(N2InformationTransferRspData.class).timeout(Duration.of(nrfTimeOutMillisecond, ChronoUnit.MILLIS)).block();
+                    log.info("amfInfo Http Send(" + i + ")-> OK {}, {}", amfInfo, n2InformationTransferRspData);
+                    break;
+                } catch (Exception e) {
+                    log.error("amf Http Send(" + i + ") transfer error " + amfInfo, e);
+                    if(null != amfError) {
+                        amfError.accept(amfInfo, now, e);
+                    }
+                }
+
+            }
+
+            return n2InformationTransferRspData;
+        }
+
+        @Transactional
+        public void deleteAmfAndInfoAndTac(String amgSetName) {
+            List<EcoreAmf> ecoreAmfs = amfRepository.findAllByAmfSetName(amgSetName);
+            Optional.ofNullable(ecoreAmfs).orElse(Collections.emptyList()).stream().forEach(it -> {
+                amfInfoRepository.deleteByAmfSeq(it.getAmfSeq());
+                amfTacRepository.deleteByAmfSeq(it.getAmfSeq());
+                amfRepository.delete(it);
+            });
+        }
+        @Transactional
+        public void mergeAmfInfos(SearchResult searchResult) {
+            Optional.ofNullable(searchResult.getNfInstances()).orElse(Collections.emptyList()).stream().forEach(it -> mergeAmfInfo(it));
+        }
+
+        @Transactional
+        public void mergeAmfInfo(NFProfile nfProfile) {
+            if (null != nfProfile && NFStatus.REGISTERED == nfProfile.getNfStatus() && NFType.AMF == nfProfile.getNfType()) {
+                //nfInstance merge
+                var amfInfo = nfProfile.getAmfInfo();
+                if (null != amfInfo && Strings.isNotBlank(amfInfo.getAmfSetId()) && Strings.isNotBlank(amfInfo.getAmfRegionId())) {
+
+                    //amf merge
+                    EcoreAmf amf = mergeAmf(amfInfo.getAmfSetId(), amfInfo.getAmfRegionId(), (it) -> it.setAmfSetName(nfProfile.getNfInstanceId()));
+
+                    // amfTac merge
+                    List<TacRange> taiRanges = Optional.ofNullable(amfInfo.getTaiRangeList()).orElse(Collections.emptyList()).stream().flatMap(it -> Optional.ofNullable(it.getTacRangeList()).orElse(Collections.emptyList()).stream()).collect(Collectors.toList());
+                    if (CollectionUtils.isNotEmpty(taiRanges)) {
+                        amfTacRepository.deleteByAmfSeq(amf.getAmfSeq());
+                        List<EcoreAmfTac> amfTacs = taiRanges.stream().map(it -> AmfTacBase.builder().amfSeq(amf.getAmfSeq()).startTac(Long.parseLong(it.getStart())).endTac(Long.parseLong(it.getEnd())).build().map(EcoreAmfTac.class)).collect(Collectors.toList());
+                        amfTacRepository.saveAll(amfTacs);
+                    }
+
+                    //amfInfo merge
+                    var nfServices = Optional.ofNullable(nfProfile.getNfServices()).orElse(Collections.emptyList());
+                    List<IpEndPoint> ipEndPoints = nfServices.stream().filter(it -> "namf-comm".equals(it.getServiceName())).flatMap(it -> Optional.ofNullable(it.getIpEndPoints()).orElse(Collections.emptyList()).stream()).collect(Collectors.toList());
+                    if (CollectionUtils.isNotEmpty(ipEndPoints)) {
+                        amfInfoRepository.deleteByAmfSeq(amf.getAmfSeq());
+                        var amfTacs = new ArrayList<EcoreAmfInfo>();
+                        for (int i = 0; i < ipEndPoints.size(); i++) {
+                            IpEndPoint it = ipEndPoints.get(i);
+                            amfTacs.add(
+                                    AmfInfoBase.builder()
+                                            .amfSeq(amf.getAmfSeq())
+                                            .amfName(String.valueOf(i))
+                                            .ipv4(it.getIpv4Address())
+                                            .ipv4(it.getIpv4Address())
+                                            .ipv6(it.getIpv6Address())
+                                            .port(Long.valueOf(it.getPort()))
+                                            .status(AmfStatus.A)
+                                            .amfSort(Long.valueOf(i))
+                                            .registDt(new Date())
+                                            .updateDt(new Date())
+                                            .build()
+                                            .map(EcoreAmfInfo.class)
+                            );
+                        }
+                        amfInfoRepository.saveAll(amfTacs);
+                    }
+                }
+
+            }
+
+        }
+
+        public EcoreAmf mergeAmf(String amfSetId, String amfRegionId) {
+            return mergeAmf(amfSetId, amfRegionId);
+        }
+
+        public EcoreAmf mergeAmf(String amfSetId, String amfRegionId, Consumer<EcoreAmf> consumer) {
+            EcoreAmf amf = Optional.ofNullable(amfRepository.findByAmfSetIdAndAmfRegionIdAndStatus(amfSetId, amfRegionId, AmfStatus.A)).orElseGet(() -> {
+                EcoreAmf r = new EcoreAmf();
+                r.setAmfSetId(amfSetId);
+                r.setAmfRegionId(amfRegionId);
+                r.setStatus(AmfStatus.A);
+                r.setUpdateDt(new Date());
+                r.setRegistDt(new Date());
+                return r;
+            });
+            if (null != consumer) {
+                consumer.accept(amf);
+            }
+            return amfRepository.save(amf);
+
+        }
+    }
+
+  ```
